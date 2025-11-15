@@ -2,7 +2,7 @@ import './globals.css'
 import { Comic_Neue } from 'next/font/google'
 import Providers from './providers'
 import { Toaster } from 'react-hot-toast'
-
+import { Analytics } from "@vercel/analytics/next"
 const comicNeue = Comic_Neue({ 
   weight: ['400', '700'],
   subsets: ['latin'],
@@ -73,6 +73,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={comicNeue.className}>
+        <Analytics />
         <Providers>{children}</Providers>
         <Toaster
           position="top-center"
