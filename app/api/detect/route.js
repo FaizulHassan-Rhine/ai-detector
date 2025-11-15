@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import connectDB from '@/lib/mongodb'
+import ImageHistory from '@/models/ImageHistory'
 
 export async function POST(request) {
   try {
@@ -6,11 +10,14 @@ export async function POST(request) {
     
     let imageData = null
     let isUrl = false
+    let originalImageUrl = null
+    let fileType = 'image/jpeg' // Default
 
     // Handle URL submission
     if (contentType?.includes('application/json')) {
       const body = await request.json()
       imageData = body.url
+      originalImageUrl = body.url
       isUrl = true
     } 
     // Handle file upload
@@ -29,6 +36,10 @@ export async function POST(request) {
       const bytes = await file.arrayBuffer()
       const buffer = Buffer.from(bytes)
       imageData = buffer.toString('base64')
+      fileType = file.type || 'image/jpeg'
+      
+      // Store as base64 data URL for display in dashboard
+      originalImageUrl = `data:${fileType};base64,${imageData}`
     }
 
     if (!imageData) {
@@ -57,6 +68,59 @@ export async function POST(request) {
     const realProb = Number(realPercent.toFixed(2))
 
     console.log('Parsed values - AI:', aiProb, 'Real:', realProb)
+
+    // Save to database if user is authenticated
+    const session = await getServerSession(authOptions)
+    console.log('Session check:', session ? `User: ${session.user.email}, ID: ${session.user.id}` : 'No session')
+    
+    if (session && session.user) {
+      try {
+        await connectDB()
+        
+        // Get user ID from database if not in session
+        let userId = session.user.id
+        if (!userId) {
+          const User = require('@/models/User').default
+          const user = await User.findOne({ email: session.user.email })
+          if (user) {
+            userId = user._id.toString()
+            console.log('Found user ID from database:', userId)
+          }
+        }
+        
+        if (!userId) {
+          console.error('Cannot save history: User ID not found')
+        } else {
+          const historyData = {
+            userId: userId,
+            userEmail: session.user.email,
+            userName: session.user.name || 'Unknown',
+            imageUrl: originalImageUrl,
+            imageType: isUrl ? 'url' : 'upload',
+            aiProbability: aiProb,
+            realProbability: realProb,
+            finalResult: predictedLabel === 'artificial' ? 'AI' : 'REAL',
+            processingTime,
+            imageMetadata: {
+              filename: metaInfo.filename,
+              format: metaInfo.original_format,
+              width: metaInfo.size[0],
+              height: metaInfo.size[1],
+            },
+          }
+          
+          console.log('Saving detection history:', JSON.stringify(historyData, null, 2))
+          const savedHistory = await ImageHistory.create(historyData)
+          console.log('✅ Detection result saved to history! ID:', savedHistory._id)
+        }
+      } catch (dbError) {
+        console.error('❌ Error saving to database:', dbError)
+        console.error('Error details:', dbError.message)
+        // Don't fail the request if database save fails
+      }
+    } else {
+      console.log('⚠️  Not saving to database: User not authenticated')
+    }
 
     return NextResponse.json({
       aiProbability: aiProb,

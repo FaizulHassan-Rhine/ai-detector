@@ -2,13 +2,19 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Eye, EyeOff, User, ArrowRight } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User, ArrowRight, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
+import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 
 export default function SignUp() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,16 +24,87 @@ export default function SignUp() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    setError('') // Clear error when user types
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
+    
+    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!')
+      toast.error('Passwords do not match!')
       return
     }
-    // Handle sign up logic here
-    console.log('Sign up:', formData)
+
+    // Validate password length
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+
+    setLoading(true)
+    const toastId = toast.loading('Creating your account...')
+
+    try {
+      // Call signup API
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create account')
+      }
+
+      toast.success('Account created successfully!', { id: toastId })
+
+      // Auto sign in after successful signup
+      toast.loading('Signing you in...', { id: toastId })
+      const result = await signIn('credentials', {
+        redirect: false,
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (result.error) {
+        throw new Error('Account created but auto-login failed. Please sign in.')
+      }
+
+      toast.success('Welcome! Redirecting...', { id: toastId })
+      
+      // Redirect to home page
+      setTimeout(() => {
+        router.push('/')
+        router.refresh()
+      }, 500)
+    } catch (error) {
+      toast.error(error.message, { id: toastId })
+      setError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSignUp = async () => {
+    try {
+      setLoading(true)
+      toast.loading('Redirecting to Google...')
+      await signIn('google', { callbackUrl: '/?auth=google-success' })
+    } catch (error) {
+      toast.error('Failed to sign up with Google')
+      setError('Failed to sign up with Google')
+      setLoading(false)
+    }
   }
 
   return (
@@ -59,6 +136,13 @@ export default function SignUp() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
         >
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/50">
+              <p className="text-red-500 text-sm">{error}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name Input */}
             <div>
@@ -185,13 +269,23 @@ export default function SignUp() {
             {/* Sign Up Button */}
             <motion.button
               type="submit"
-              className="w-full py-3 rounded-lg font-semibold text-black flex items-center justify-center gap-2 transition-all"
+              disabled={loading}
+              className="w-full py-3 rounded-lg font-semibold text-black flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: '#86F06F' }}
-              whileHover={{ scale: 1.02, backgroundColor: '#75df5e' }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={!loading ? { scale: 1.02, backgroundColor: '#75df5e' } : {}}
+              whileTap={!loading ? { scale: 0.98 } : {}}
             >
-              Create Account
-              <ArrowRight className="w-5 h-5" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  Create Account
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </motion.button>
           </form>
 
@@ -205,11 +299,12 @@ export default function SignUp() {
           {/* Google Sign Up */}
           <motion.button
             type="button"
-            onClick={() => console.log('Google Sign Up')}
-            className="w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-3 transition-all"
+            onClick={handleGoogleSignUp}
+            disabled={loading}
+            className="w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#0a0a0a', border: '1px solid #333333' }}
-            whileHover={{ scale: 1.02, borderColor: '#86F06F' }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={!loading ? { scale: 1.02, borderColor: '#86F06F' } : {}}
+            whileTap={!loading ? { scale: 0.98 } : {}}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path

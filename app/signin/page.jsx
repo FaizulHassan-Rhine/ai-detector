@@ -2,19 +2,65 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
+import toast from 'react-hot-toast'
 import Navbar from '../components/Navbar'
 
 export default function SignIn() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Handle sign in logic here
-    console.log('Sign in:', { email, password })
+    setError('')
+    setLoading(true)
+
+    const toastId = toast.loading('Signing you in...')
+
+    try {
+      const result = await signIn('credentials', {
+        redirect: false,
+        email: email,
+        password: password,
+      })
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      toast.success('Welcome back! Redirecting...', { id: toastId })
+      
+      // Redirect to home page on success
+      setTimeout(() => {
+        router.push('/')
+        router.refresh()
+      }, 500)
+    } catch (error) {
+      const errorMessage = error.message || 'Invalid email or password'
+      toast.error(errorMessage, { id: toastId })
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true)
+      toast.loading('Redirecting to Google...')
+      await signIn('google', { callbackUrl: '/?auth=google-success' })
+    } catch (error) {
+      toast.error('Failed to sign in with Google')
+      setError('Failed to sign in with Google')
+      setLoading(false)
+    }
   }
 
   return (
@@ -46,6 +92,13 @@ export default function SignIn() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
         >
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/50">
+              <p className="text-red-500 text-sm">{error}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Input */}
             <div>
@@ -57,7 +110,10 @@ export default function SignIn() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError('')
+                  }}
                   placeholder="your@email.com"
                   required
                   className="w-full pl-11 pr-4 py-3 rounded-lg focus:outline-none focus:ring-2 text-white placeholder-gray-500 transition-all"
@@ -78,7 +134,10 @@ export default function SignIn() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setError('')
+                  }}
                   placeholder="••••••••"
                   required
                   className="w-full pl-11 pr-12 py-3 rounded-lg focus:outline-none focus:ring-2 text-white placeholder-gray-500 transition-all"
@@ -114,13 +173,23 @@ export default function SignIn() {
             {/* Sign In Button */}
             <motion.button
               type="submit"
-              className="w-full py-3 rounded-lg font-semibold text-black flex items-center justify-center gap-2 transition-all"
+              disabled={loading}
+              className="w-full py-3 rounded-lg font-semibold text-black flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: '#86F06F' }}
-              whileHover={{ scale: 1.02, backgroundColor: '#75df5e' }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={!loading ? { scale: 1.02, backgroundColor: '#75df5e' } : {}}
+              whileTap={!loading ? { scale: 0.98 } : {}}
             >
-              Sign In
-              <ArrowRight className="w-5 h-5" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                <>
+                  Sign In
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </motion.button>
           </form>
 
@@ -134,11 +203,12 @@ export default function SignIn() {
           {/* Google Sign In */}
           <motion.button
             type="button"
-            onClick={() => console.log('Google Sign In')}
-            className="w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-3 transition-all"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#0a0a0a', border: '1px solid #333333' }}
-            whileHover={{ scale: 1.02, borderColor: '#86F06F' }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={!loading ? { scale: 1.02, borderColor: '#86F06F' } : {}}
+            whileTap={!loading ? { scale: 0.98 } : {}}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path

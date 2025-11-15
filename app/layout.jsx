@@ -1,5 +1,7 @@
 import './globals.css'
 import { Comic_Neue } from 'next/font/google'
+import Providers from './providers'
+import { Toaster } from 'react-hot-toast'
 
 const comicNeue = Comic_Neue({ 
   weight: ['400', '700'],
@@ -70,7 +72,41 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={comicNeue.className}>{children}</body>
+      <body className={comicNeue.className}>
+        <Providers>{children}</Providers>
+        <Toaster
+          position="top-center"
+          reverseOrder={false}
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#0a0a0a',
+              color: '#fff',
+              border: '1px solid #333333',
+              borderRadius: '0.5rem',
+              padding: '16px',
+            },
+            success: {
+              iconTheme: {
+                primary: '#86F06F',
+                secondary: '#000',
+              },
+              style: {
+                border: '1px solid #86F06F',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+              style: {
+                border: '1px solid #ef4444',
+              },
+            },
+          }}
+        />
+      </body>
     </html>
   )
 }

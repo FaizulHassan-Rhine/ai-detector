@@ -1,13 +1,15 @@
 'use client'
 
-import { LogIn } from 'lucide-react'
+import { LogIn, LogOut, User } from 'lucide-react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 
 export default function Navbar() {
   const pathname = usePathname()
+  const { data: session, status } = useSession()
 
   const NavLink = ({ href, children }) => {
     const isActive = pathname === href
@@ -63,18 +65,53 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-6">
             <NavLink href="/">Home</NavLink>
             <NavLink href="/api-docs">API Docs</NavLink>
+            {session && <NavLink href="/dashboard">Dashboard</NavLink>}
             <div className="ml-4">
-              <Link href="/signin">
-                <motion.button
-                  className="flex items-center gap-2 px-5 py-2 rounded-lg text-black font-semibold transition-colors"
-                  style={{ backgroundColor: '#86F06F' }}
-                  whileHover={{ scale: 1.05, backgroundColor: '#75df5e' }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <LogIn className="w-4 h-4" />
-                  Sign In
-                </motion.button>
-              </Link>
+              {session ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg border" style={{ borderColor: '#333333' }}>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#86F06F] to-[#75df5e] flex items-center justify-center">
+                      {session.user.image ? (
+                        <Image 
+                          src={session.user.image} 
+                          alt={session.user.name} 
+                          width={32} 
+                          height={32}
+                          className="rounded-full"
+                        />
+                      ) : (
+                        <User className="w-4 h-4 text-black" />
+                      )}
+                    </div>
+                    <span className="text-gray-300 text-sm">{session.user.name || session.user.email}</span>
+                  </div>
+                  <motion.button
+                    onClick={() => signOut({ callbackUrl: '/' })}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold transition-colors border"
+                    style={{ backgroundColor: '#0a0a0a', borderColor: '#333333' }}
+                    whileHover={{ scale: 1.05, borderColor: '#86F06F' }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </motion.button>
+                </div>
+              ) : (
+                <Link href="/signin">
+                  <motion.button
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg text-black font-semibold transition-colors"
+                    style={{ backgroundColor: '#86F06F' }}
+                    whileHover={{ scale: 1.05, backgroundColor: '#75df5e' }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </motion.button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
